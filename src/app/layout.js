@@ -11,7 +11,7 @@ export const viewport = {
 };
 
 export const metadata = {
-    metadataBase: new URL("https://campconnect.vercel.app"),
+    metadataBase: new URL("https://mini-mvp-neon.vercel.app/"),
 
     title: {
         default: "Camp Connect — NYSC Social Hub",
@@ -50,7 +50,7 @@ export const metadata = {
     manifest: "/manifest.json",
 
     alternates: {
-        canonical: "https://campconnect.vercel.app",
+        canonical: "https://mini-mvp-neon.vercel.app/",
     },
 
     appleWebApp: {
@@ -89,7 +89,7 @@ export const metadata = {
         title: "Camp Connect — NYSC Social Hub",
         description:
             "A modern social platform for Nigerian NYSC corps members to connect, share camp experiences, vote in polls, and discuss trending camp topics.",
-        url: "https://campconnect.vercel.app",
+        url: "https://mini-mvp-neon.vercel.app/",
         siteName: "Camp Connect",
         locale: "en_NG",
         type: "website",

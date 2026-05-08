@@ -277,7 +277,7 @@ export default function NotificationsPage() {
                             see it here
                         </p>
                         <Link
-                            href="/feed"
+                            href="/"
                             className="mt-4 inline-block px-6 py-2.5 rounded-2xl font-bold text-sm text-white"
                             style={{ background: "#556B2F" }}
                         >

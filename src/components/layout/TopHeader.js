@@ -24,7 +24,7 @@ const TopHeader = memo(function TopHeader({
     title,
     showSearch = false,
     showBack = false,
-    backHref = "/feed",
+    backHref = "/",
     right,
 }) {
     const { profile } = useAuth();
@@ -50,7 +50,7 @@ const TopHeader = memo(function TopHeader({
                 ) : (
                     !title && (
                         <Link
-                            href="/feed"
+                            href="/"
                             className="flex items-center gap-2 mr-auto"
                         >
                             <div

@@ -133,7 +133,7 @@ export default function PostDetailPage({ params }) {
     const authorPhoto = author?.photoURL || post.authorPhotoURL;
 
     return (
-        <AppShell showBack backHref="/feed">
+        <AppShell showBack backHref="/">
             <div className="px-4 py-4 flex flex-col gap-4">
                 {post.imageURL && (
                     <div className="rounded-2xl overflow-hidden">

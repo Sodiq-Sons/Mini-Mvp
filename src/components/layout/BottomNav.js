@@ -14,7 +14,7 @@ const BottomNav = memo(function BottomNav() {
     if (!user) return null;
 
     const NAV_ITEMS = [
-        { href: "/feed", icon: Home, label: "Home" },
+        { href: "/", icon: Home, label: "Home" },
         { href: "/trending", icon: Flame, label: "Trending" },
         { href: "/create", icon: PlusCircle, label: "Post", accent: true },
         {

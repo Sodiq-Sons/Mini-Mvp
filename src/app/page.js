@@ -57,15 +57,20 @@ export default function FeedPage() {
             setLastDoc(null);
             setHasMore(true);
             try {
-                const {
-                    posts: newPosts,
-                    lastDoc: last,
-                    hasMore: more,
-                } = await getPosts(currentFilter, null, 10);
+                const q = query(
+                    collection(db, "posts"),
+                    orderBy("createdAt", "desc"),
+                    limit(10),
+                );
+                const snap = await getDocs(q);
+                const newPosts = snap.docs.map((d) => ({
+                    id: d.id,
+                    ...d.data(),
+                }));
                 const map = await fetchAuthors(newPosts);
                 setPosts(newPosts);
-                setLastDoc(last);
-                setHasMore(more);
+                setLastDoc(snap.docs[snap.docs.length - 1] ?? null);
+                setHasMore(snap.docs.length === 10);
                 setAuthorMap(map);
             } finally {
                 setLoading(false);
@@ -75,7 +80,7 @@ export default function FeedPage() {
     );
 
     useEffect(() => {
-        if (user && profile?.onboardingComplete) {
+        if (user) {
             activeFilterRef.current = filter;
             fetchPosts(filter);
         }

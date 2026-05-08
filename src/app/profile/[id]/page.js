@@ -111,7 +111,7 @@ export default function ProfilePage({ params }) {
 
     if (loading)
         return (
-            <AppShell showBack backHref="/feed">
+            <AppShell showBack backHref="/">
                 <div className="flex justify-center py-20">
                     <Loader2
                         size={28}
@@ -125,7 +125,7 @@ export default function ProfilePage({ params }) {
 
     if (!profile)
         return (
-            <AppShell showBack backHref="/feed" title="Profile">
+            <AppShell showBack backHref="/" title="Profile">
                 <div className="text-center py-20">
                     <div className="text-5xl mb-3" aria-hidden="true">
                         👤
@@ -144,7 +144,7 @@ export default function ProfilePage({ params }) {
     return (
         <AppShell
             showBack
-            backHref="/feed"
+            backHref="/"
             headerRight={
                 isOwnProfile ? (
                     <Link
