@@ -1,5 +1,3 @@
-import withPWA from "next-pwa";
-
 const nextConfig = {
     images: {
         remotePatterns: [
@@ -13,14 +11,6 @@ const nextConfig = {
     },
     compress: true,
     poweredByHeader: false,
-    experimental: {
-        turbopack: false,
-    },
 };
 
-export default withPWA({
-    dest: "public",
-    register: true,
-    skipWaiting: true,
-    disable: process.env.NODE_ENV === "development",
-})(nextConfig);
+export default nextConfig;

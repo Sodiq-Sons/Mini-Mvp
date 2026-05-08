@@ -1,5 +1,6 @@
 import { Toaster } from "react-hot-toast";
 import { AuthProvider } from "@/context/AuthContext";
+import Providers from "./providers";
 import "./globals.css";
 
 export const viewport = {
@@ -43,13 +44,9 @@ export const metadata = {
     ],
 
     creator: "Camp Connect",
-
     publisher: "Camp Connect",
-
     applicationName: "Camp Connect",
-
     category: "social networking",
-
     manifest: "/manifest.json",
 
     alternates: {
@@ -90,18 +87,12 @@ export const metadata = {
 
     openGraph: {
         title: "Camp Connect — NYSC Social Hub",
-
         description:
             "A modern social platform for Nigerian NYSC corps members to connect, share camp experiences, vote in polls, and discuss trending camp topics.",
-
         url: "https://campconnect.vercel.app",
-
         siteName: "Camp Connect",
-
         locale: "en_NG",
-
         type: "website",
-
         images: [
             {
                 url: "/og-image.png",
@@ -114,11 +105,8 @@ export const metadata = {
 
     twitter: {
         card: "summary_large_image",
-
         title: "Camp Connect — NYSC Social Hub",
-
         description: "The ultimate social platform for Nigerian corps members.",
-
         images: ["/og-image.png"],
     },
 
@@ -139,14 +127,15 @@ export default function RootLayout({ children }) {
     return (
         <html lang="en">
             <head>
-                <link rel="preconnect" href="https://fonts.googleapis.com" />
+                <link rel="manifest" href="/manifest.json" />
+                <meta name="theme-color" content="#556B2F" />
 
+                <link rel="preconnect" href="https://fonts.googleapis.com" />
                 <link
                     rel="preconnect"
                     href="https://fonts.gstatic.com"
                     crossOrigin=""
                 />
-
                 <link
                     href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap"
                     rel="stylesheet"
@@ -155,28 +144,7 @@ export default function RootLayout({ children }) {
 
             <body>
                 <AuthProvider>
-                    {children}
-
-                    <Toaster
-                        position="top-center"
-                        toastOptions={{
-                            style: {
-                                background: "#FFFDF8",
-                                color: "#1F2937",
-                                border: "1px solid #D6D3C9",
-                                borderRadius: "12px",
-                                fontFamily: "'Plus Jakarta Sans', sans-serif",
-                                fontSize: "14px",
-                            },
-
-                            success: {
-                                iconTheme: {
-                                    primary: "#556B2F",
-                                    secondary: "#fff",
-                                },
-                            },
-                        }}
-                    />
+                    <Providers>{children}</Providers>
                 </AuthProvider>
             </body>
         </html>
