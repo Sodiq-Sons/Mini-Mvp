@@ -1,5 +1,14 @@
 "use client";
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
+import {
+    collection,
+    query,
+    orderBy,
+    limit,
+    getDocs,
+    startAfter,
+} from "firebase/firestore";
+import { db } from "@/lib/firebase";
 import { useRouter } from "next/navigation";
 import AppShell from "@/components/layout/AppShell";
 import PostCard from "@/components/feed/PostCard";
