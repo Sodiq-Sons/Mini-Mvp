@@ -170,7 +170,7 @@ export default function FeedPage() {
 
             <FeedFilter active={filter} onChange={setFilter} />
 
-            <div className="px-4 pb-4 flex flex-col gap-3">
+            <div className="px-4 pb-4 flex flex-col gap-3 mt-4">
                 {loading ? (
                     <SkeletonLoader count={4} />
                 ) : posts.length === 0 ? (
