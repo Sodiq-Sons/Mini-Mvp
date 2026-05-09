@@ -20,12 +20,25 @@ const BORDER_RADIUS = 6;
 function useChart(canvasRef, type, data, options) {
     useEffect(() => {
         if (!canvasRef.current || typeof window === "undefined") return;
-        let chart;
+
+        let chartInstance = null;
+        let destroyed = false; // flag set by cleanup before promise resolves
+
         import("chart.js").then(({ Chart, registerables }) => {
+            if (destroyed || !canvasRef.current) return; // bail if already cleaned up
             Chart.register(...registerables);
-            chart = new Chart(canvasRef.current, { type, data, options });
+            chartInstance = new Chart(canvasRef.current, {
+                type,
+                data,
+                options,
+            });
         });
-        return () => chart?.destroy();
+
+        return () => {
+            destroyed = true; // signals the .then() not to create the chart
+            chartInstance?.destroy(); // handles case where promise already resolved
+            chartInstance = null;
+        };
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 }
@@ -136,24 +149,26 @@ function Metric({ value, label, color }) {
 // ─── BarChart ─────────────────────────────────────────────────────────────────
 export function BarChart({ data, title, horizontal = false }) {
     const ref = useRef(null);
-    if (!data || data.length === 0) return null;
 
-    const colors = data.map((_, i) => PALETTE[i % PALETTE.length]);
+    const colors = (data || []).map((_, i) => PALETTE[i % PALETTE.length]);
     const chartData = {
-        labels: data.map((d) => d.label),
+        labels: (data || []).map((d) => d.label),
         datasets: [
             {
-                data: data.map((d) => d.value),
+                data: (data || []).map((d) => d.value),
                 backgroundColor: colors,
                 borderRadius: BORDER_RADIUS,
                 borderSkipped: false,
             },
         ],
     };
-    const height = horizontal ? Math.max(data.length * 40 + 60, 160) : 220;
+    const height = horizontal
+        ? Math.max((data?.length || 0) * 40 + 60, 160)
+        : 220;
 
-    // eslint-disable-next-line react-hooks/rules-of-hooks
     useChart(ref, "bar", chartData, barOptions(horizontal));
+
+    if (!data || data.length === 0) return null;
 
     const total = data.reduce((s, d) => s + d.value, 0);
 
@@ -201,16 +216,14 @@ export function BarChart({ data, title, horizontal = false }) {
 // ─── PieChart (donut) ─────────────────────────────────────────────────────────
 export function PieChart({ data, title }) {
     const ref = useRef(null);
-    if (!data || data.length === 0) return null;
 
-    const total = data.reduce((s, d) => s + d.value, 0);
-    const colors = data.map((_, i) => PALETTE[i % PALETTE.length]);
-
+    const total = (data || []).reduce((s, d) => s + d.value, 0);
+    const colors = (data || []).map((_, i) => PALETTE[i % PALETTE.length]);
     const chartData = {
-        labels: data.map((d) => d.label),
+        labels: (data || []).map((d) => d.label),
         datasets: [
             {
-                data: data.map((d) => d.value),
+                data: (data || []).map((d) => d.value),
                 backgroundColor: colors,
                 borderWidth: 2,
                 borderColor: "#FFFDF8",
@@ -219,6 +232,8 @@ export function PieChart({ data, title }) {
     };
 
     useChart(ref, "doughnut", chartData, donutOptions());
+
+    if (!data || data.length === 0) return null;
 
     return (
         <div
@@ -403,9 +418,7 @@ export function PercentageIndicator({
     );
 }
 
-// ─── DemographicsPanel — tabbed view of all breakdown charts ─────────────────
-// Pass `votes` array and `pollOptions` array (strings) for a full demographics breakdown.
-// Each vote should have { optionIndex, demographics: { gender, age, stateOfOrigin, religion, institutionType, platoonNumber, campLocation } }
+// ─── DemographicsPanel ────────────────────────────────────────────────────────
 export function DemographicsPanel({
     votes = [],
     pollOptions = [],
@@ -421,7 +434,6 @@ export function DemographicsPanel({
     ];
     const [active, setActive] = useState("results");
 
-    // Aggregate helper
     const aggregate = (field) => {
         const counts = {};
         votes.forEach((v) => {
@@ -434,7 +446,6 @@ export function DemographicsPanel({
             .map(([label, value]) => ({ label, value }));
     };
 
-    // Results breakdown
     const resultsData = (pollOptions || []).map((text, i) => ({
         label: text,
         value: votes.filter((v) => v.optionIndex === i).length,
@@ -455,11 +466,10 @@ export function DemographicsPanel({
         institution: aggregate("institutionType"),
     };
 
-    const useDonut = (id) => ["gender", "religion"].includes(id);
+    const isDonutChart = (id) => ["gender", "religion"].includes(id);
 
     return (
         <div>
-            {/* Summary metrics */}
             <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
                 <Metric
                     value={totalVotes || votes.length}
@@ -470,7 +480,6 @@ export function DemographicsPanel({
                 <Metric value={topGender} label="Top gender" color="#d95f02" />
             </div>
 
-            {/* Tab strip */}
             <div
                 style={{
                     display: "flex",
@@ -504,9 +513,8 @@ export function DemographicsPanel({
                 ))}
             </div>
 
-            {/* Active chart */}
             {tabData[active]?.length > 0 ? (
-                useDonut(active) ? (
+                isDonutChart(active) ? (
                     <PieChart data={tabData[active]} />
                 ) : (
                     <BarChart

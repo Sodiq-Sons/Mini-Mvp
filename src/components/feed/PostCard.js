@@ -1,6 +1,7 @@
 "use client";
 import { useState, useCallback, memo } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { formatDistanceToNow } from "date-fns";
 import {
     ThumbsUp,
@@ -41,7 +42,6 @@ function StatBtn({ icon: Icon, count, active, activeColor, onClick, label }) {
     );
 }
 
-// Stable date formatter — avoids re-computation on every render
 function useFormattedTime(createdAt) {
     const date = createdAt?.toDate ? createdAt.toDate() : new Date();
     return formatDistanceToNow(date, { addSuffix: true });
@@ -49,6 +49,7 @@ function useFormattedTime(createdAt) {
 
 const PostCard = memo(function PostCard({ post, authorProfile }) {
     const { user } = useAuth();
+    const router = useRouter();
     const [likeCount, setLikeCount] = useState(post.likeCount || 0);
     const [dislikeCount, setDislikeCount] = useState(post.dislikeCount || 0);
     const [likedBy, setLikedBy] = useState(post.likedBy || []);
@@ -67,27 +68,23 @@ const PostCard = memo(function PostCard({ post, authorProfile }) {
             if (acting) return;
             setActing(true);
 
-            const wasDisliked = isDisliked;
-
             try {
                 if (isLiked) {
-                    // Undo like
+                    // undo like
                     setLikeCount((c) => c - 1);
                     setLikedBy((b) => b.filter((id) => id !== user.uid));
                     await likePost(post.id, user.uid, "unlike");
                 } else {
-                    // Add like
+                    // add like — remove dislike only if they had disliked
                     setLikeCount((c) => c + 1);
                     setLikedBy((b) => [...b, user.uid]);
-                    // Only remove dislike if they had actually disliked
-                    if (wasDisliked) {
+                    if (isDisliked) {
                         setDislikeCount((c) => Math.max(0, c - 1));
                         setDislikedBy((b) => b.filter((id) => id !== user.uid));
                     }
                     await likePost(post.id, user.uid, "like");
                 }
             } catch {
-                // Roll back on failure
                 setLikeCount(post.likeCount || 0);
                 setDislikeCount(post.dislikeCount || 0);
                 setLikedBy(post.likedBy || []);
@@ -108,10 +105,12 @@ const PostCard = memo(function PostCard({ post, authorProfile }) {
             setActing(true);
             try {
                 if (isDisliked) {
+                    // undo dislike
                     setDislikeCount((c) => c - 1);
                     setDislikedBy((b) => b.filter((id) => id !== user.uid));
                     await likePost(post.id, user.uid, "undislike");
                 } else {
+                    // add dislike — remove like only if they had liked
                     setDislikeCount((c) => c + 1);
                     setDislikedBy((b) => [...b, user.uid]);
                     if (isLiked) {
@@ -120,11 +119,16 @@ const PostCard = memo(function PostCard({ post, authorProfile }) {
                     }
                     await likePost(post.id, user.uid, "dislike");
                 }
+            } catch {
+                setLikeCount(post.likeCount || 0);
+                setDislikeCount(post.dislikeCount || 0);
+                setLikedBy(post.likedBy || []);
+                setDislikedBy(post.dislikedBy || []);
             } finally {
                 setActing(false);
             }
         },
-        [user, isLiked, isDisliked, acting, post.id],
+        [user, isLiked, isDisliked, acting, post],
     );
 
     const handleShare = useCallback(
@@ -155,9 +159,12 @@ const PostCard = memo(function PostCard({ post, authorProfile }) {
     const platoon = authorProfile?.platoonNumber || post.authorPlatoon;
 
     return (
-        <Link href={`/post/${post.id}`} className="block">
+        <div
+            className="block cursor-pointer"
+            onClick={() => router.push(`/post/${post.id}`)}
+        >
             <article
-                className="rounded-2xl border post-card cursor-pointer"
+                className="rounded-2xl border post-card"
                 style={{ background: "#FFFDF8", borderColor: "#D6D3C9" }}
             >
                 {post.imageURL && (
@@ -304,7 +311,7 @@ const PostCard = memo(function PostCard({ post, authorProfile }) {
                     </div>
                 </div>
             </article>
-        </Link>
+        </div>
     );
 });
 

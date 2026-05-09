@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect, useCallback, useRef, useMemo } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import {
     collection,
     query,
@@ -31,9 +31,9 @@ export default function FeedPage() {
     const sentinelRef = useRef(null);
     const observerRef = useRef(null);
     const redirectedRef = useRef(false);
-    const activeFilterRef = useRef(filter); // track filter without re-creating loadMore
+    const activeFilterRef = useRef(filter);
 
-    // Single redirect effect
+    // ── Redirect ──────────────────────────────────────────────────────────────
     useEffect(() => {
         if (authLoading || redirectedRef.current) return;
         if (!user) {
@@ -45,7 +45,7 @@ export default function FeedPage() {
         }
     }, [user, profile, authLoading, router]);
 
-    // Batch fetch authors for a list of posts
+    // ── Helper: batch-fetch authors not already in map ────────────────────────
     const fetchAuthors = useCallback(async (newPosts, existingMap = {}) => {
         const uids = [
             ...new Set(newPosts.map((p) => p.authorId).filter(Boolean)),
@@ -59,8 +59,14 @@ export default function FeedPage() {
         return map;
     }, []);
 
-    const fetchPosts = useCallback(
-        async (currentFilter) => {
+    // ── Initial / filter-change fetch — defined inside effect to avoid cascade ─
+    useEffect(() => {
+        if (!user) return;
+
+        let cancelled = false;
+        activeFilterRef.current = filter;
+
+        async function load() {
             setLoading(true);
             setPosts([]);
             setLastDoc(null);
@@ -72,29 +78,29 @@ export default function FeedPage() {
                     limit(10),
                 );
                 const snap = await getDocs(q);
+                if (cancelled) return;
                 const newPosts = snap.docs.map((d) => ({
                     id: d.id,
                     ...d.data(),
                 }));
                 const map = await fetchAuthors(newPosts);
+                if (cancelled) return;
                 setPosts(newPosts);
                 setLastDoc(snap.docs[snap.docs.length - 1] ?? null);
                 setHasMore(snap.docs.length === 10);
                 setAuthorMap(map);
             } finally {
-                setLoading(false);
+                if (!cancelled) setLoading(false);
             }
-        },
-        [fetchAuthors],
-    );
-
-    useEffect(() => {
-        if (user) {
-            activeFilterRef.current = filter;
-            fetchPosts(filter);
         }
-    }, [filter, user, profile, fetchPosts]);
 
+        load();
+        return () => {
+            cancelled = true;
+        };
+    }, [filter, user, fetchAuthors]);
+
+    // ── Load more (pagination) ────────────────────────────────────────────────
     const loadMore = useCallback(async () => {
         if (loadingMore || !hasMore || !lastDoc) return;
         setLoadingMore(true);
@@ -117,7 +123,7 @@ export default function FeedPage() {
         }
     }, [loadingMore, hasMore, lastDoc, authorMap, fetchAuthors]);
 
-    // Stable intersection observer — only re-created when loadMore identity changes
+    // ── Intersection observer ─────────────────────────────────────────────────
     useEffect(() => {
         if (observerRef.current) observerRef.current.disconnect();
         observerRef.current = new IntersectionObserver(
@@ -130,6 +136,53 @@ export default function FeedPage() {
             observerRef.current.observe(sentinelRef.current);
         return () => observerRef.current?.disconnect();
     }, [loadMore]);
+
+    // ── Refresh handler (passed to button) ───────────────────────────────────
+    const handleRefresh = useCallback(() => {
+        // toggling a ref-based counter or just re-setting filter triggers the effect
+        setFilter((f) => f); // same value — won't re-run; use a refresh token instead
+    }, []);
+
+    // Use a refresh token so the "Refresh feed" button works
+    const [refreshToken, setRefreshToken] = useState(0);
+
+    useEffect(() => {
+        if (!user || refreshToken === 0) return;
+        let cancelled = false;
+
+        async function load() {
+            setLoading(true);
+            setPosts([]);
+            setLastDoc(null);
+            setHasMore(true);
+            try {
+                const q = query(
+                    collection(db, "posts"),
+                    orderBy("createdAt", "desc"),
+                    limit(10),
+                );
+                const snap = await getDocs(q);
+                if (cancelled) return;
+                const newPosts = snap.docs.map((d) => ({
+                    id: d.id,
+                    ...d.data(),
+                }));
+                const map = await fetchAuthors(newPosts);
+                if (cancelled) return;
+                setPosts(newPosts);
+                setLastDoc(snap.docs[snap.docs.length - 1] ?? null);
+                setHasMore(snap.docs.length === 10);
+                setAuthorMap(map);
+            } finally {
+                if (!cancelled) setLoading(false);
+            }
+        }
+
+        load();
+        return () => {
+            cancelled = true;
+        };
+    }, [refreshToken, user, fetchAuthors]);
 
     if (authLoading || !user) return null;
 
@@ -226,7 +279,9 @@ export default function FeedPage() {
                                     You&apos;ve seen it all! 🎉
                                 </p>
                                 <button
-                                    onClick={() => fetchPosts(filter)}
+                                    onClick={() =>
+                                        setRefreshToken((t) => t + 1)
+                                    }
                                     className="mt-2 flex items-center gap-1 text-xs font-semibold mx-auto"
                                     style={{ color: "#556B2F" }}
                                 >
