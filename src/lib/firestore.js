@@ -224,8 +224,40 @@ export const submitVote = async (
 ) => {
     const voteRef = doc(db, "votes", `${pollId}_${uid}`);
     const existing = await getDoc(voteRef);
-    if (existing.exists()) return { error: "already_voted" };
 
+    const pollSnap = await getDoc(doc(db, "polls", pollId));
+    if (!pollSnap.exists()) return { error: "poll_not_found" };
+    const opts = [...(pollSnap.data().options || [])];
+
+    if (existing.exists()) {
+        const prevIndex = existing.data().optionIndex;
+        if (prevIndex === optionIndex) return { error: "same_vote" };
+
+        // Change vote: decrement old, increment new
+        opts[prevIndex] = {
+            ...opts[prevIndex],
+            voteCount: Math.max(0, (opts[prevIndex].voteCount || 0) - 1),
+        };
+        opts[optionIndex] = {
+            ...opts[optionIndex],
+            voteCount: (opts[optionIndex].voteCount || 0) + 1,
+        };
+
+        await Promise.all([
+            setDoc(voteRef, {
+                postId,
+                pollId,
+                optionIndex,
+                uid,
+                demographics: userDemographics,
+                createdAt: serverTimestamp(),
+            }),
+            updateDoc(doc(db, "polls", pollId), { options: opts }), // totalVotes unchanged
+        ]);
+        return { success: true, changed: true, prevIndex };
+    }
+
+    // First-time vote
     await setDoc(voteRef, {
         postId,
         pollId,
@@ -234,26 +266,21 @@ export const submitVote = async (
         demographics: userDemographics,
         createdAt: serverTimestamp(),
     });
-
-    const pollSnap = await getDoc(doc(db, "polls", pollId));
-    if (pollSnap.exists()) {
-        const opts = [...(pollSnap.data().options || [])];
-        opts[optionIndex] = {
-            ...opts[optionIndex],
-            voteCount: (opts[optionIndex].voteCount || 0) + 1,
-        };
-        await updateDoc(doc(db, "polls", pollId), {
-            options: opts,
-            totalVotes: increment(1),
-        });
-    }
+    opts[optionIndex] = {
+        ...opts[optionIndex],
+        voteCount: (opts[optionIndex].voteCount || 0) + 1,
+    };
+    await updateDoc(doc(db, "polls", pollId), {
+        options: opts,
+        totalVotes: increment(1),
+    });
 
     updateDoc(doc(db, "users", uid), { pollVoteCount: increment(1) }).catch(
         () => {},
     );
     userCache.delete(uid);
     logActivity(uid, { type: "vote", postId, pollId }).catch(() => {});
-    return { success: true };
+    return { success: true, changed: false };
 };
 
 export const getPollVotes = async (pollId) => {

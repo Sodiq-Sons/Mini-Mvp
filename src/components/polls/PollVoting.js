@@ -1,6 +1,14 @@
 "use client";
 import { useState, useEffect } from "react";
-import { BarChart2, Users, CheckCircle2, Loader2 } from "lucide-react";
+import {
+    BarChart2,
+    Users,
+    CheckCircle2,
+    Loader2,
+    RefreshCw,
+    ChevronDown,
+    ChevronUp,
+} from "lucide-react";
 import {
     submitVote,
     getPollById,
@@ -9,67 +17,111 @@ import {
 } from "@/lib/firestore";
 import { useAuth } from "@/context/AuthContext";
 import toast from "react-hot-toast";
+import { DemographicsPanel } from "../charts/Charts";
 
-function ProgressBar({ percent, color = "#556B2F" }) {
+// ─── Palette for demographic segments ────────────────────────────────────────
+const SEGMENT_COLORS = [
+    { bg: "#4F7942", light: "#EDF2E8", text: "#fff" },
+    { bg: "#D4845A", light: "#FDF0E8", text: "#fff" },
+    { bg: "#5B7FA6", light: "#E8F0F8", text: "#fff" },
+    { bg: "#A66B9A", light: "#F5EAF5", text: "#fff" },
+    { bg: "#C4A24A", light: "#FBF5E2", text: "#fff" },
+    { bg: "#5A9E8F", light: "#E5F4F2", text: "#fff" },
+];
+
+// ─── Animated stacked bar for a demographic breakdown ────────────────────────
+function StackedBar({ segments, total }) {
     return (
-        <div
-            className="h-2 rounded-full overflow-hidden flex-1"
-            style={{ background: "#EDF2E8" }}
-        >
-            <div
-                className="h-full rounded-full transition-all duration-700"
-                style={{ width: `${percent}%`, background: color }}
-            />
+        <div className="flex h-5 w-full rounded-full overflow-hidden gap-px">
+            {segments.map((s, i) => {
+                const pct = total > 0 ? (s.count / total) * 100 : 0;
+                if (pct < 1) return null;
+                return (
+                    <div
+                        key={s.label}
+                        title={`${s.label}: ${Math.round(pct)}%`}
+                        style={{
+                            width: `${pct}%`,
+                            background:
+                                SEGMENT_COLORS[i % SEGMENT_COLORS.length].bg,
+                            transition: `width 0.8s cubic-bezier(0.34,1.2,0.64,1) ${i * 60}ms`,
+                        }}
+                    />
+                );
+            })}
         </div>
     );
 }
 
-function DemoChart({ votes, field, title }) {
+// ─── Single demographic card ──────────────────────────────────────────────────
+function DemoCard({ votes, field, title, emoji }) {
     const breakdown = {};
     votes.forEach((v) => {
         const key = v.demographics?.[field] || "Unknown";
-        if (!breakdown[key]) breakdown[key] = {};
-        const optIdx = v.optionIndex;
-        breakdown[key][optIdx] = (breakdown[key][optIdx] || 0) + 1;
+        breakdown[key] = (breakdown[key] || 0) + 1;
     });
 
-    const entries = Object.entries(breakdown)
-        .sort((a, b) => {
-            const aTotal = Object.values(a[1]).reduce((s, n) => s + n, 0);
-            const bTotal = Object.values(b[1]).reduce((s, n) => s + n, 0);
-            return bTotal - aTotal;
-        })
-        .slice(0, 6);
+    const segments = Object.entries(breakdown)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 6)
+        .map(([label, count]) => ({ label, count }));
 
-    if (entries.length === 0) return null;
+    const total = segments.reduce((s, seg) => s + seg.count, 0);
+    if (total === 0) return null;
+
+    const top = segments[0];
+    const topPct = Math.round((top.count / total) * 100);
 
     return (
-        <div className="mb-4">
-            <h4 className="text-xs font-bold mb-2" style={{ color: "#6B7280" }}>
-                {title}
-            </h4>
-            <div className="flex flex-col gap-1.5">
-                {entries.map(([key, counts]) => {
-                    const total = Object.values(counts).reduce(
-                        (s, n) => s + n,
-                        0,
-                    );
-                    const topIdx = Object.keys(counts).sort(
-                        (a, b) => counts[b] - counts[a],
-                    )[0];
-                    const pct = Math.round((counts[topIdx] / total) * 100);
+        <div
+            className="rounded-2xl p-4 flex flex-col gap-3"
+            style={{ background: "#F8F5EE", border: "1px solid #E8E4D8" }}
+        >
+            {/* Header */}
+            <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                    <span className="text-base">{emoji}</span>
+                    <span
+                        className="text-xs font-bold tracking-wide uppercase"
+                        style={{ color: "#556B2F" }}
+                    >
+                        {title}
+                    </span>
+                </div>
+                <span
+                    className="text-[10px] font-bold px-2 py-0.5 rounded-full"
+                    style={{ background: SEGMENT_COLORS[0].bg, color: "#fff" }}
+                >
+                    #{top.label} leads
+                </span>
+            </div>
+
+            {/* Stacked bar */}
+            <StackedBar segments={segments} total={total} />
+
+            {/* Legend */}
+            <div className="flex flex-wrap gap-x-3 gap-y-1.5">
+                {segments.map((s, i) => {
+                    const pct = Math.round((s.count / total) * 100);
+                    const color = SEGMENT_COLORS[i % SEGMENT_COLORS.length];
                     return (
-                        <div key={key} className="flex items-center gap-2">
+                        <div
+                            key={s.label}
+                            className="flex items-center gap-1.5"
+                        >
+                            <div
+                                className="w-2.5 h-2.5 rounded-sm flex-shrink-0"
+                                style={{ background: color.bg }}
+                            />
                             <span
-                                className="text-xs w-24 truncate"
-                                style={{ color: "#6B7280" }}
+                                className="text-[11px]"
+                                style={{ color: "#374151" }}
                             >
-                                {key}
+                                {s.label}
                             </span>
-                            <ProgressBar percent={pct} />
                             <span
-                                className="text-xs font-bold w-8 text-right"
-                                style={{ color: "#556B2F" }}
+                                className="text-[11px] font-bold"
+                                style={{ color: color.bg }}
                             >
                                 {pct}%
                             </span>
@@ -81,6 +133,27 @@ function DemoChart({ votes, field, title }) {
     );
 }
 
+// ─── Big summary stat ─────────────────────────────────────────────────────────
+function StatPill({ value, label, color }) {
+    return (
+        <div
+            className="flex-1 rounded-2xl p-3 flex flex-col items-center gap-0.5"
+            style={{ background: "#F0EDE4" }}
+        >
+            <span className="text-lg font-black" style={{ color }}>
+                {value}
+            </span>
+            <span
+                className="text-[10px] font-semibold uppercase tracking-wide"
+                style={{ color: "#9CA3AF" }}
+            >
+                {label}
+            </span>
+        </div>
+    );
+}
+
+// ─── Main component ───────────────────────────────────────────────────────────
 export default function PollVoting({ postId, pollId }) {
     const { user, profile } = useAuth();
     const [poll, setPoll] = useState(null);
@@ -89,6 +162,7 @@ export default function PollVoting({ postId, pollId }) {
     const [loading, setLoading] = useState(true);
     const [voting, setVoting] = useState(false);
     const [showAnalytics, setShowAnalytics] = useState(false);
+    const [changingVote, setChangingVote] = useState(false);
 
     useEffect(() => {
         if (!pollId) return;
@@ -106,30 +180,40 @@ export default function PollVoting({ postId, pollId }) {
         load();
     }, [pollId, user]);
 
+    const buildDemographics = () => ({
+        age: profile?.age
+            ? profile.age < 22
+                ? "Under 22"
+                : profile.age < 25
+                  ? "22–24"
+                  : profile.age < 28
+                    ? "25–27"
+                    : "28+"
+            : "Unknown",
+        gender: profile?.gender || "Unknown",
+        religion: profile?.religion || "Unknown",
+        stateOfOrigin: profile?.stateOfOrigin || "Unknown",
+        campLocation: profile?.campLocation || "Unknown",
+        institutionType: profile?.institutionType || "Unknown",
+        platoonNumber: profile?.platoonNumber
+            ? `Platoon ${profile.platoonNumber}`
+            : "Unknown",
+    });
+
     const handleVote = async (optionIndex) => {
         if (!user) return toast.error("Sign in to vote");
-        if (userVote) return toast.error("You already voted!");
+        if (voting) return;
+
+        // If same choice, do nothing
+        if (userVote?.optionIndex === optionIndex) {
+            setChangingVote(false);
+            return;
+        }
+
         setVoting(true);
+        const demographics = buildDemographics();
+
         try {
-            const demographics = {
-                age: profile?.age
-                    ? profile.age < 22
-                        ? "Under 22"
-                        : profile.age < 25
-                          ? "22-24"
-                          : profile.age < 28
-                            ? "25-27"
-                            : "28+"
-                    : "Unknown",
-                gender: profile?.gender || "Unknown",
-                religion: profile?.religion || "Unknown",
-                stateOfOrigin: profile?.stateOfOrigin || "Unknown",
-                campLocation: profile?.campLocation || "Unknown",
-                institutionType: profile?.institutionType || "Unknown",
-                platoonNumber: profile?.platoonNumber
-                    ? `Platoon ${profile.platoonNumber}`
-                    : "Unknown",
-            };
             const result = await submitVote(
                 postId,
                 pollId,
@@ -137,21 +221,47 @@ export default function PollVoting({ postId, pollId }) {
                 user.uid,
                 demographics,
             );
-            if (result.error === "already_voted")
-                return toast.error("Already voted!");
+
+            if (result.error === "same_vote") {
+                setChangingVote(false);
+                return;
+            }
+            if (result.error === "poll_not_found") {
+                toast.error("Poll not found");
+                return;
+            }
+
+            const prevIndex = result.changed ? userVote?.optionIndex : null;
             const newVote = { optionIndex, demographics };
+
             setUserVote(newVote);
-            setVotes((prev) => [...prev, { ...newVote, uid: user.uid }]);
+            setVotes((prev) => {
+                const filtered = prev.filter((v) => v.uid !== user.uid);
+                return [...filtered, { ...newVote, uid: user.uid }];
+            });
             setPoll((prev) => ({
                 ...prev,
-                totalVotes: (prev.totalVotes || 0) + 1,
-                options: prev.options.map((o, i) =>
-                    i === optionIndex
-                        ? { ...o, voteCount: (o.voteCount || 0) + 1 }
-                        : o,
-                ),
+                totalVotes: result.changed
+                    ? prev.totalVotes
+                    : (prev.totalVotes || 0) + 1,
+                options: prev.options.map((o, i) => {
+                    if (i === optionIndex)
+                        return { ...o, voteCount: (o.voteCount || 0) + 1 };
+                    if (result.changed && i === prevIndex)
+                        return {
+                            ...o,
+                            voteCount: Math.max(0, (o.voteCount || 0) - 1),
+                        };
+                    return o;
+                }),
             }));
-            toast.success("Vote recorded! 🎉");
+
+            setChangingVote(false);
+            toast.success(
+                result.changed ? "Vote changed! ✅" : "Vote recorded! 🎉",
+            );
+        } catch {
+            toast.error("Something went wrong");
         } finally {
             setVoting(false);
         }
@@ -177,37 +287,80 @@ export default function PollVoting({ postId, pollId }) {
 
     const totalVotes = poll.totalVotes || 0;
     const hasVoted = !!userVote;
+    const isSelecting = !hasVoted || changingVote;
+
+    // Demographics summary stats
+    const uniqueStates = new Set(
+        votes.map((v) => v.demographics?.stateOfOrigin).filter(Boolean),
+    ).size;
+    const genderBreakdown = {};
+    votes.forEach((v) => {
+        const g = v.demographics?.gender || "Unknown";
+        genderBreakdown[g] = (genderBreakdown[g] || 0) + 1;
+    });
+    const topGender = Object.entries(genderBreakdown).sort(
+        (a, b) => b[1] - a[1],
+    )[0];
 
     return (
         <div
-            className="rounded-2xl border"
+            className="rounded-2xl border overflow-hidden"
             style={{ background: "#FFFDF8", borderColor: "#D6D3C9" }}
         >
-            <div className="p-4 border-b" style={{ borderColor: "#D6D3C9" }}>
-                <div className="flex items-center gap-2">
-                    <BarChart2 size={18} style={{ color: "#556B2F" }} />
+            {/* ── Header ── */}
+            <div
+                className="px-4 pt-4 pb-3 border-b"
+                style={{ borderColor: "#EDE9DF" }}
+            >
+                <div className="flex items-center gap-2 mb-1">
+                    <BarChart2 size={16} style={{ color: "#556B2F" }} />
                     <span
-                        className="font-bold text-sm"
+                        className="font-bold text-xs tracking-widest uppercase"
                         style={{ color: "#556B2F" }}
                     >
                         Poll
                     </span>
-                    {hasVoted && (
-                        <CheckCircle2 size={16} style={{ color: "#10B981" }} />
+                    {hasVoted && !changingVote && (
+                        <CheckCircle2 size={15} style={{ color: "#10B981" }} />
                     )}
                 </div>
                 <p
-                    className="font-display font-bold text-base mt-1"
+                    className="font-bold text-base leading-snug"
                     style={{ color: "#1F2937" }}
                 >
                     {poll.question}
                 </p>
-                <p className="text-xs mt-1" style={{ color: "#6B7280" }}>
-                    <Users size={12} className="inline mr-1" />
-                    {totalVotes} votes
-                </p>
+                <div className="flex items-center gap-3 mt-1.5">
+                    <span
+                        className="text-xs flex items-center gap-1"
+                        style={{ color: "#9CA3AF" }}
+                    >
+                        <Users size={11} />
+                        {totalVotes} {totalVotes === 1 ? "vote" : "votes"}
+                    </span>
+                    {hasVoted && !changingVote && (
+                        <button
+                            onClick={() => setChangingVote(true)}
+                            className="flex items-center gap-1 text-xs font-semibold"
+                            style={{ color: "#556B2F" }}
+                        >
+                            <RefreshCw size={11} />
+                            Change vote
+                        </button>
+                    )}
+                    {changingVote && (
+                        <button
+                            onClick={() => setChangingVote(false)}
+                            className="text-xs font-semibold"
+                            style={{ color: "#9CA3AF" }}
+                        >
+                            Cancel
+                        </button>
+                    )}
+                </div>
             </div>
 
+            {/* ── Options ── */}
             <div className="p-4 flex flex-col gap-2.5">
                 {poll.options?.map((option, i) => {
                     const pct =
@@ -217,137 +370,132 @@ export default function PollVoting({ postId, pollId }) {
                               )
                             : 0;
                     const isUserChoice = userVote?.optionIndex === i;
+                    const showResults = hasVoted && !changingVote;
+
                     return (
                         <button
                             key={i}
-                            onClick={() => !hasVoted && handleVote(i)}
-                            disabled={voting || hasVoted}
-                            className="w-full text-left rounded-2xl border overflow-hidden transition-all relative"
+                            onClick={() => isSelecting && handleVote(i)}
+                            disabled={voting}
+                            className="w-full text-left rounded-2xl border overflow-hidden relative"
                             style={{
-                                background: isUserChoice
-                                    ? "#EDF2E8"
-                                    : hasVoted
-                                      ? "#F8F5EE"
-                                      : "#FFFDF8",
-                                borderColor: isUserChoice
-                                    ? "#556B2F"
-                                    : "#D6D3C9",
-                                cursor: hasVoted ? "default" : "pointer",
+                                background:
+                                    isUserChoice && showResults
+                                        ? "#EDF2E8"
+                                        : "#F8F5EE",
+                                borderColor:
+                                    isUserChoice && showResults
+                                        ? "#556B2F"
+                                        : changingVote && isUserChoice
+                                          ? "#A0B580"
+                                          : "#D6D3C9",
+                                cursor: isSelecting ? "pointer" : "default",
+                                transition:
+                                    "border-color 0.2s, background 0.2s",
                             }}
                         >
-                            {/* progress fill */}
-                            {hasVoted && (
+                            {/* Animated fill bar */}
+                            {showResults && (
                                 <div
-                                    className="absolute inset-0 rounded-2xl"
+                                    className="absolute inset-0"
                                     style={{
                                         width: `${pct}%`,
                                         background: isUserChoice
-                                            ? "rgba(85,107,47,0.1)"
-                                            : "rgba(214,211,201,0.4)",
+                                            ? "rgba(85,107,47,0.12)"
+                                            : "rgba(200,195,180,0.35)",
                                         transition:
-                                            "width 0.7s cubic-bezier(0.34,1.56,0.64,1)",
+                                            "width 0.8s cubic-bezier(0.34,1.1,0.64,1)",
                                     }}
                                 />
                             )}
-                            <div className="relative flex items-center justify-between px-4 py-3">
-                                <div className="flex items-center gap-2">
-                                    {isUserChoice && (
+
+                            <div className="relative flex items-center justify-between px-4 py-3 gap-2">
+                                <div className="flex items-center gap-2 min-w-0">
+                                    {isUserChoice && showResults ? (
                                         <CheckCircle2
                                             size={15}
                                             style={{ color: "#556B2F" }}
+                                            className="flex-shrink-0"
                                         />
-                                    )}
+                                    ) : isSelecting ? (
+                                        <div
+                                            className="w-4 h-4 rounded-full border-2 flex-shrink-0"
+                                            style={{
+                                                borderColor: isUserChoice
+                                                    ? "#556B2F"
+                                                    : "#C4BFB0",
+                                            }}
+                                        />
+                                    ) : null}
                                     <span
-                                        className="text-sm font-semibold"
+                                        className="text-sm font-semibold truncate"
                                         style={{
-                                            color: isUserChoice
-                                                ? "#556B2F"
-                                                : "#1F2937",
+                                            color:
+                                                isUserChoice && showResults
+                                                    ? "#556B2F"
+                                                    : "#1F2937",
                                         }}
                                     >
                                         {option.text}
                                     </span>
                                 </div>
-                                {hasVoted && (
-                                    <span
-                                        className="text-sm font-bold"
-                                        style={{
-                                            color: isUserChoice
-                                                ? "#556B2F"
-                                                : "#6B7280",
-                                        }}
-                                    >
-                                        {pct}%
-                                    </span>
-                                )}
-                                {voting && !hasVoted && (
-                                    <Loader2
-                                        size={14}
-                                        className="animate-spin"
-                                        style={{ color: "#6B7280" }}
-                                    />
-                                )}
+                                <div className="flex items-center gap-2 flex-shrink-0">
+                                    {showResults && (
+                                        <span
+                                            className="text-sm font-black tabular-nums"
+                                            style={{
+                                                color: isUserChoice
+                                                    ? "#556B2F"
+                                                    : "#9CA3AF",
+                                            }}
+                                        >
+                                            {pct}%
+                                        </span>
+                                    )}
+                                    {voting && (
+                                        <Loader2
+                                            size={13}
+                                            className="animate-spin"
+                                            style={{ color: "#9CA3AF" }}
+                                        />
+                                    )}
+                                </div>
                             </div>
                         </button>
                     );
                 })}
             </div>
 
-            {/* Analytics toggle */}
-            {hasVoted && votes.length > 0 && (
+            {/* ── Demographics toggle ── */}
+            {hasVoted && votes.length >= 2 && (
                 <div className="px-4 pb-4">
                     <button
                         onClick={() => setShowAnalytics(!showAnalytics)}
-                        className="w-full py-2.5 rounded-2xl text-sm font-semibold border transition-all"
+                        className="w-full py-2.5 rounded-2xl text-sm font-bold flex items-center justify-center gap-2 transition-all"
                         style={{
-                            borderColor: "#556B2F",
+                            background: showAnalytics ? "#EDF2E8" : "#F0EDE4",
                             color: "#556B2F",
-                            background: showAnalytics
-                                ? "#EDF2E8"
-                                : "transparent",
+                            border: "1.5px solid",
+                            borderColor: showAnalytics ? "#556B2F" : "#D6D3C9",
                         }}
                     >
+                        <BarChart2 size={15} />
                         {showAnalytics
-                            ? "Hide Analytics"
-                            : "📊 View Demographics"}
+                            ? "Hide breakdown"
+                            : "View who voted what"}
+                        {showAnalytics ? (
+                            <ChevronUp size={14} />
+                        ) : (
+                            <ChevronDown size={14} />
+                        )}
                     </button>
+
                     {showAnalytics && (
-                        <div className="mt-4 fade-in">
-                            <h3
-                                className="font-bold text-sm mb-3"
-                                style={{ color: "#1F2937" }}
-                            >
-                                Vote Breakdown
-                            </h3>
-                            <DemoChart
+                        <div className="mt-4">
+                            <DemographicsPanel
                                 votes={votes}
-                                field="gender"
-                                title="By Gender"
-                            />
-                            <DemoChart
-                                votes={votes}
-                                field="age"
-                                title="By Age Group"
-                            />
-                            <DemoChart
-                                votes={votes}
-                                field="stateOfOrigin"
-                                title="By State of Origin"
-                            />
-                            <DemoChart
-                                votes={votes}
-                                field="campLocation"
-                                title="By Camp"
-                            />
-                            <DemoChart
-                                votes={votes}
-                                field="religion"
-                                title="By Religion"
-                            />
-                            <DemoChart
-                                votes={votes}
-                                field="institutionType"
-                                title="By Institution Type"
+                                pollOptions={poll.options?.map((o) => o.text)}
+                                totalVotes={poll.totalVotes}
                             />
                         </div>
                     )}

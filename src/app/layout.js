@@ -95,7 +95,7 @@ export const metadata = {
         type: "website",
         images: [
             {
-                url: "/og-image.png",
+                url: "/og-image.webp",
                 width: 1200,
                 height: 630,
                 alt: "Camp Connect",
@@ -107,7 +107,7 @@ export const metadata = {
         card: "summary_large_image",
         title: "Camp Connect — NYSC Social Hub",
         description: "The ultimate social platform for Nigerian corps members.",
-        images: ["/og-image.png"],
+        images: ["/og-image.webp"],
     },
 
     robots: {

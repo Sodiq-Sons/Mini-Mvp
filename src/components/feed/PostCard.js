@@ -66,25 +66,37 @@ const PostCard = memo(function PostCard({ post, authorProfile }) {
             if (!user) return toast.error("Sign in to like posts");
             if (acting) return;
             setActing(true);
+
+            const wasDisliked = isDisliked;
+
             try {
                 if (isLiked) {
+                    // Undo like
                     setLikeCount((c) => c - 1);
                     setLikedBy((b) => b.filter((id) => id !== user.uid));
                     await likePost(post.id, user.uid, "unlike");
                 } else {
+                    // Add like
                     setLikeCount((c) => c + 1);
                     setLikedBy((b) => [...b, user.uid]);
-                    if (isDisliked) {
-                        setDislikeCount((c) => c - 1);
+                    // Only remove dislike if they had actually disliked
+                    if (wasDisliked) {
+                        setDislikeCount((c) => Math.max(0, c - 1));
                         setDislikedBy((b) => b.filter((id) => id !== user.uid));
                     }
                     await likePost(post.id, user.uid, "like");
                 }
+            } catch {
+                // Roll back on failure
+                setLikeCount(post.likeCount || 0);
+                setDislikeCount(post.dislikeCount || 0);
+                setLikedBy(post.likedBy || []);
+                setDislikedBy(post.dislikedBy || []);
             } finally {
                 setActing(false);
             }
         },
-        [user, isLiked, isDisliked, acting, post.id],
+        [user, isLiked, isDisliked, acting, post],
     );
 
     const handleDislike = useCallback(

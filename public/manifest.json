@@ -1,6 +1,6 @@
 {
     "name": "Camp Connect",
-    "short_name": "CampConnect",
+    "short_name": "Camp Connect",
     "description": "The social hub for NYSC corps members across Nigeria",
     "start_url": "/",
     "scope": "/",
@@ -35,7 +35,7 @@
             "description": "Share a new camp story"
         },
         {
-            "name": "Feed",
+            "name": "Home",
             "url": "/",
             "description": "See what's happening"
         }
